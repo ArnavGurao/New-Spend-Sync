@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>SpendSync — Smart Card & Subscription Tracker</title>
+  <meta name="description" content="Track subscriptions, optimize cards, control finances with SMS detection.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { headline: ['Manrope', 'sans-serif'], body: ['Inter', 'sans-serif'], label: ['Inter', 'sans-serif'] },
+          colors: {
+            primary: '#c6c6c7', 'primary-dim': '#b8b9b9', 'primary-container': '#454747', 'on-primary': '#3f4041',
+            secondary: '#ffbf00', 'secondary-dim': '#eeb200', 'secondary-container': '#4e3800', 'on-secondary': '#563e00',
+            tertiary: '#ff716b', 'tertiary-container': '#ff4d4d', 'on-tertiary': '#490005',
+            error: '#ee7d77', 'error-dim': '#bb5551', 'error-container': '#7f2927', 'on-error': '#490106', 'on-error-container': '#ff9993',
+            'on-surface': '#e7e5e4', 'on-surface-variant': '#acabaa',
+            surface: '#0e0e0e', 'surface-container-lowest': '#000000', 'surface-container-low': '#131313',
+            'surface-container': '#191a1a', 'surface-container-high': '#1f2020', 'surface-container-highest': '#252626',
+            'surface-bright': '#2c2c2c', outline: '#767575', 'outline-variant': '#484848',
+            'chart-1': '#FF6D00', 'chart-2': '#00BFA5', 'chart-3': '#304FFE', 'chart-4': '#F50057', 'chart-5': '#FFD600',
+            'brand-teal': '#00C9A7'
+          },
+          borderRadius: { full: '0.75rem' }
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent
+    }
+
+    body {
+      background: #0e0e0e;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden
+    }
+
+    .screen {
+      display: none;
+      min-height: 100vh
+    }
+
+    .screen.active {
+      display: block
+    }
+
+    .font-headline {
+      font-family: 'Manrope', sans-serif
+    }
+
+    .font-body,
+    .font-label {
+      font-family: 'Inter', sans-serif
+    }
+
+    .ms {
+      font-family: 'Material Symbols Outlined';
+      font-variation-settings: 'FILL' 0
+    }
+
+    .ms-fill {
+      font-family: 'Material Symbols Outlined';
+      font-variation-settings: 'FILL' 1
+    }
+
+    .editorial-shadow {
+      box-shadow: 0 32px 64px -12px rgba(231, 229, 228, 0.05)
+    }
+
+    .tap-highlight-none {
+      -webkit-tap-highlight-color: transparent
+    }
+
+    ::-webkit-scrollbar {
+      display: none
+    }
+
+    .hide-scroll {
+      -ms-overflow-style: none;
+      scrollbar-width: none
+    }
+
+    .stacked-card {
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)
+    }
+
+    .stacked-card:hover {
+      transform: translateY(-12px) scale(1.02) !important;
+      z-index: 50 !important
+    }
+  </style>
+</head>
+
+<body class="text-on-surface min-h-screen">
+
+  <!-- TOAST -->
+  <div id="sms-toast" class="hidden fixed top-4 left-0 right-0 z-[100] mx-4 max-w-sm mx-auto"></div>
+
+  <!-- HEADER -->
+  <header id="app-header" class="sticky top-0 z-50 bg-surface text-primary">
+    <div id="header-inner" class="flex justify-between items-center w-full px-6 py-4 bg-surface-container-low"></div>
+  </header>
+
+  <!-- SCREENS -->
+  <div id="screen-dashboard" class="screen active"></div>
+  <div id="screen-subscriptions" class="screen"></div>
+  <div id="screen-add-card" class="screen"></div>
+  <div id="screen-analytics" class="screen"></div>
+  <div id="screen-alerts" class="screen"></div>
+  <div id="screen-advisor" class="screen"></div>
+  <div id="screen-dna" class="screen"></div>
+
+  <!-- BOTTOM SHEET -->
+  <div id="sms-overlay" class="hidden fixed inset-0 bg-black/60 z-[60]" onclick="closeSMSPrompt()"></div>
+  <div id="sms-sheet"
+    class="hidden fixed bottom-0 left-0 right-0 z-[70] bg-surface-container rounded-t-3xl max-w-sm mx-auto"
+    style="max-height:75vh;overflow-y:auto">
+    <div class="p-6">
+      <div class="w-12 h-1 bg-outline-variant rounded-full mx-auto mb-5"></div>
+      <div id="sms-sheet-content"></div>
+    </div>
+  </div>
+
+  <!-- FLOATING ACTION BAR (card detail) -->
+  <div id="floating-bar" class="hidden fixed bottom-24 left-0 w-full px-6 pointer-events-none z-40">
+    <div
+      class="max-w-sm mx-auto w-full bg-surface-container-high/90 backdrop-blur-xl border border-outline-variant/10 rounded-full p-6 flex justify-between items-center editorial-shadow pointer-events-auto">
+      <div>
+        <p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-0.5">Total due this month
+        </p>
+        <p id="float-amount" class="font-headline text-2xl font-bold text-primary"></p>
+      </div>
+      <button
+        class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-8 py-3 rounded-full font-bold font-headline text-sm active:scale-95 transition-transform">Auto-Pay</button>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav id="bottom-nav"
+    class="bg-surface-container/80 backdrop-blur-xl fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 z-50 border-t border-outline-variant/15 shadow-2xl rounded-t-3xl max-w-sm mx-auto">
+  </nav>
+
+  <script>
+    /* ═══ STATE ═══ */
+    const S = {
+      currentScreen: 'dashboard', selectedCardId: null, alertFilter: 'all',
+      pendingSMS: null, smsStep: 1, smsBillingType: null, smsCycle: null,
+      newCard: { bank: '', variant: '', lastFour: '', expiry: '', network: 'Visa' },
+      cards: [
+        { id: 'hdfc', bank: 'HDFC Bank', variant: 'HDFC INFINIA', last4: '4521', expiry: '08/27', network: 'Visa', gradient: 'from-[#8b1d1d] via-[#e11d48] to-[#4c0519]', monthlySpend: 976 },
+        { id: 'icici', bank: 'ICICI Bank', variant: 'ICICI EMERALDE', last4: '8834', expiry: '03/26', network: 'Mastercard', gradient: 'from-[#E65C00] to-[#993D00]', monthlySpend: 637 },
+        { id: 'sbi', bank: 'State Bank of India', variant: 'SBI AURUM', last4: '2210', expiry: '11/28', network: 'RuPay', gradient: 'from-[#003366] to-[#001A33]', monthlySpend: 629 },
+        { id: 'axis', bank: 'Axis Bank', variant: 'AXIS BANK MAGNUS', last4: '6603', expiry: '06/27', network: 'Visa', gradient: 'from-[#4A0E1C] to-[#2D0911]', monthlySpend: 1384 }
+      ],
+      subscriptions: [
+        { id: 'sub1', name: 'Netflix', cardId: 'hdfc', amount: 649, billingType: 'recurring', cycle: 'monthly', renewalDays: 3, category: 'Entertainment', icon: 'movie', status: 'urgent' },
+        { id: 'sub2', name: 'Spotify', cardId: 'hdfc', amount: 119, billingType: 'recurring', cycle: 'monthly', renewalDays: 12, category: 'Entertainment', icon: 'music_note', status: 'safe' },
+        { id: 'sub3', name: 'Amazon Prime', cardId: 'hdfc', amount: 208, billingType: 'recurring', cycle: 'monthly', renewalDays: 8, category: 'Shopping', icon: 'shopping_cart', status: 'warning' },
+        { id: 'sub4', name: 'YouTube Premium', cardId: 'icici', amount: 189, billingType: 'recurring', cycle: 'monthly', renewalDays: 20, category: 'Entertainment', icon: 'smart_display', status: 'safe' },
+        { id: 'sub5', name: 'Disney+ Hotstar', cardId: 'icici', amount: 299, billingType: 'recurring', cycle: 'monthly', renewalDays: 5, category: 'Entertainment', icon: 'live_tv', status: 'warning' },
+        { id: 'sub6', name: 'Zomato Pro', cardId: 'icici', amount: 149, billingType: 'recurring', cycle: 'monthly', renewalDays: 18, category: 'Food', icon: 'delivery_dining', status: 'safe' },
+        { id: 'sub7', name: 'Canva Pro', cardId: 'sbi', amount: 499, billingType: 'recurring', cycle: 'monthly', renewalDays: 15, category: 'Productivity', icon: 'brush', status: 'safe' },
+        { id: 'sub8', name: 'Adobe Creative Cloud', cardId: 'sbi', amount: 0, billingType: 'trial', cycle: null, renewalDays: 4, trialEndsAmount: 1675, category: 'Productivity', icon: 'gesture', status: 'trial-urgent' },
+        { id: 'sub9', name: 'Google One', cardId: 'sbi', amount: 130, billingType: 'recurring', cycle: 'monthly', renewalDays: 22, category: 'Cloud', icon: 'cloud', status: 'safe' },
+        { id: 'sub10', name: 'Zoom Pro', cardId: 'axis', amount: 1100, billingType: 'recurring', cycle: 'monthly', renewalDays: 45, category: 'Productivity', icon: 'video_call', status: 'safe' },
+        { id: 'sub11', name: 'Swiggy One', cardId: 'axis', amount: 299, billingType: 'recurring', cycle: 'monthly', renewalDays: 9, category: 'Food', icon: 'fastfood', status: 'warning' },
+        { id: 'sub12', name: 'LinkedIn Premium', cardId: 'axis', amount: 2499, billingType: 'recurring', cycle: 'monthly', renewalDays: 30, category: 'Professional', icon: 'work', status: 'safe' }
+      ],
+      smsQueue: [
+        { id: 'sms1', raw: 'Your HDFC Bank Credit Card XX4521 has been debited for INR 649.00 at NETFLIX on 28-Mar-2026. Available limit: Rs.4,19,351.00', merchant: 'Netflix', amount: 649, cardLastFour: '4521', cardId: 'hdfc', bank: 'HDFC Bank', date: '28-Mar-2026' },
+        { id: 'sms2', raw: 'Your ICICI Bank Credit Card XX8834 has been debited for INR 299.00 at HOTSTAR on 28-Mar-2026. Avl Limit: Rs.2,45,701.00', merchant: 'Disney+ Hotstar', amount: 299, cardLastFour: '8834', cardId: 'icici', bank: 'ICICI Bank', date: '28-Mar-2026' },
+        { id: 'sms3', raw: 'Your SBI Credit Card XX2210 has been debited for INR 499.00 at CANVA on 28-Mar-2026. Available Credit Limit: Rs.1,87,501.00', merchant: 'Canva Pro', amount: 499, cardLastFour: '2210', cardId: 'sbi', bank: 'State Bank of India', date: '28-Mar-2026' }
+      ]
+    };
+
+    /* ═══ HELPERS ═══ */
+    const $ = s => document.querySelector(s);
+    const $$ = s => document.querySelectorAll(s);
+    const fmt = n => '₹' + n.toLocaleString('en-IN');
+    const subsFor = cid => S.subscriptions.filter(s => s.cardId === cid);
+    const totalMonthly = () => S.subscriptions.reduce((a, s) => a + (s.billingType === 'trial' ? 0 : s.amount), 0);
+    const subCount = () => S.subscriptions.filter(s => s.billingType !== 'trial').length;
+    const statusStyle = {
+      urgent: { border: 'border-error', icon: 'text-error', pill: 'bg-error-container/20 text-error', bar: 'bg-error', days: 'text-error' },
+      warning: { border: 'border-secondary', icon: 'text-secondary', pill: 'bg-secondary-container/20 text-secondary', bar: 'bg-secondary', days: 'text-secondary' },
+      'trial-urgent': { border: 'border-primary', icon: 'text-primary', pill: 'bg-primary/10 text-primary', bar: 'bg-primary', days: 'text-primary' },
+      safe: { border: 'border-on-surface-variant/30', icon: 'text-on-surface-variant', pill: 'bg-surface-container-highest/50 text-on-surface-variant', bar: 'bg-on-surface-variant/30', days: 'text-on-surface-variant' }
+    };
+    const statusLabel = s => s === 'urgent' ? 'Urgent' : s === 'warning' ? 'Warning' : s === 'trial-urgent' ? 'Trial' : 'Safe';
+    const gradientFor = bank => { const m = { 'HDFC Bank': 'from-[#8b1d1d] via-[#e11d48] to-[#4c0519]', 'ICICI Bank': 'from-[#E65C00] to-[#993D00]', 'State Bank of India': 'from-[#003366] to-[#001A33]', 'Axis Bank': 'from-[#4A0E1C] to-[#2D0911]' }; return m[bank] || 'from-[#1a1a2e] to-[#16213e]' };
+
+    function countUp(el, target, dur = 1500) { let st = performance.now(); const up = now => { let p = Math.min((now - st) / dur, 1); p = 1 - Math.pow(1 - p, 3); el.textContent = Math.round(p * target).toLocaleString('en-IN'); if (p < 1) requestAnimationFrame(up) }; requestAnimationFrame(up) }
+
+    /* ═══ TOAST ═══ */
+    function showSMSToast(sms) {
+      const t = $('#sms-toast');
+      t.innerHTML = `<div class="bg-surface-container-highest/90 backdrop-blur-md rounded-full p-3 px-4 border border-outline-variant/20 editorial-shadow flex items-center gap-3">
+    <div class="w-10 h-10 bg-gradient-to-br from-primary to-primary-container rounded-full flex items-center justify-center flex-shrink-0"><span class="ms-fill text-on-primary text-[18px]">sms</span></div>
+    <div class="flex-1 min-w-0"><p class="text-[10px] font-bold font-headline tracking-wider text-primary uppercase">Bank SMS Detected</p><p class="text-sm text-on-surface truncate">${sms.bank}: Card ••${sms.cardLastFour} debited ${fmt(sms.amount)} at ${sms.merchant.toUpperCase()}</p></div>
+    <span class="text-[10px] text-on-surface-variant font-medium flex-shrink-0">Now</span></div>`;
+      t.style.transform = 'translateY(-120%)'; t.classList.remove('hidden');
+      requestAnimationFrame(() => { t.style.transition = 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)'; t.style.transform = 'translateY(0)' });
+      setTimeout(() => { t.style.transform = 'translateY(-120%)'; setTimeout(() => { t.classList.add('hidden'); showSMSPrompt() }, 400) }, 2500);
+    }
+    function showGenericToast(type, msg) {
+      const t = $('#sms-toast'); const ic = { success: 'check_circle', error: 'error', info: 'info' }; const cl = { success: 'text-green-400', error: 'text-error', info: 'text-primary' };
+      t.innerHTML = `<div class="bg-surface-container-highest/90 backdrop-blur-md rounded-full p-3 px-4 border border-outline-variant/20 editorial-shadow flex items-center gap-3"><span class="ms ${cl[type]} text-xl">${ic[type]}</span><span class="text-sm text-on-surface flex-1">${msg}</span></div>`;
+      t.style.transform = 'translateY(-120%)'; t.classList.remove('hidden');
+      requestAnimationFrame(() => { t.style.transition = 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)'; t.style.transform = 'translateY(0)' });
+      setTimeout(() => { t.style.transform = 'translateY(-120%)'; setTimeout(() => t.classList.add('hidden'), 400) }, 3000);
+    }
+
+    /* ═══ SMS FLOW ═══ */
+    function simulateSMS() {
+      if (!S.smsQueue.length) return showGenericToast('info', 'No more SMS in queue');
+      const sms = S.smsQueue[0]; S.pendingSMS = sms; S.smsStep = 1; S.smsBillingType = null; S.smsCycle = null;
+      const btn = $('#sim-btn'); if (btn) { btn.disabled = true; btn.innerHTML = '<span class="ms animate-spin text-lg">progress_activity</span> Listening...'; }
+      setTimeout(() => { showSMSToast(sms); if (btn) { btn.disabled = false; btn.innerHTML = '<span class="ms text-lg">sms</span> Simulate Incoming SMS'; } }, 2500);
+    }
+    function showSMSPrompt() { $('#bottom-nav').classList.add('hidden'); $('#sms-overlay').classList.remove('hidden'); const sh = $('#sms-sheet'); sh.classList.remove('hidden'); sh.style.transform = 'translateY(100%)'; requestAnimationFrame(() => { sh.style.transition = 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)'; sh.style.transform = 'translateY(0)' }); renderSMSPrompt() }
+    function closeSMSPrompt() { const sh = $('#sms-sheet'); sh.style.transform = 'translateY(100%)'; setTimeout(() => { $('#sms-overlay').classList.add('hidden'); sh.classList.add('hidden'); $('#bottom-nav').classList.remove('hidden') }, 400) }
+
+    function renderSMSPrompt() {
+      const sms = S.pendingSMS; if (!sms) return; const sc = $('#sms-sheet-content');
+      if (S.smsStep === 1) {
+        const selR = S.smsBillingType === 'recurring', selT = S.smsBillingType === 'trial';
+        sc.innerHTML = `
+      <p class="text-[10px] font-label uppercase tracking-[0.2em] text-primary mb-3">SpendSync Detected a Charge</p>
+      <div class="bg-surface rounded-xl p-3 font-mono text-xs text-on-surface-variant border border-outline-variant mb-5 leading-relaxed">${sms.raw}</div>
+      <div class="bg-surface-container-highest rounded-2xl p-4 mb-6 space-y-3">
+        ${[['Merchant', sms.merchant], ['Amount', fmt(sms.amount)], ['Card', sms.bank.split(' ')[0] + ' ••' + sms.cardLastFour], ['Date', sms.date]].map(([l, v]) => `<div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="ms text-green-400 text-[16px]">check_circle</span><span class="text-on-surface-variant text-xs">${l}</span></div><div class="text-right"><span class="text-white font-bold text-sm">${v}</span><span class="text-green-400 text-[10px] ml-2">Auto-detected</span></div></div>`).join('')}
+      </div>
+      <p class="font-headline font-semibold text-white text-base mb-4">One question — what is this charge?</p>
+      <div class="grid grid-cols-2 gap-3 mb-5">
+        <button onclick="S.smsBillingType='recurring';renderSMSPrompt()" class="rounded-2xl p-5 flex flex-col items-center gap-2 border transition-all active:scale-95 ${selR ? 'border-primary bg-primary/10' : 'border-outline-variant bg-surface-container-highest'}"><span class="ms text-2xl ${selR ? 'text-primary' : 'text-on-surface-variant'}">repeat</span><span class="text-sm font-headline font-semibold ${selR ? 'text-primary' : 'text-on-surface'}">Recurring Subscription</span></button>
+        <button onclick="S.smsBillingType='trial';renderSMSPrompt()" class="rounded-2xl p-5 flex flex-col items-center gap-2 border transition-all active:scale-95 ${selT ? 'border-primary bg-primary/10' : 'border-outline-variant bg-surface-container-highest'}"><span class="ms text-2xl ${selT ? 'text-primary' : 'text-on-surface-variant'}">timer</span><span class="text-sm font-headline font-semibold ${selT ? 'text-primary' : 'text-on-surface'}">Free Trial</span></button>
+      </div>
+      ${S.smsBillingType ? `<button onclick="S.smsStep=2;renderSMSPrompt()" class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-full py-4 font-headline font-bold active:scale-95 transition-transform">Next</button>` : ''}`;
+      } else {
+        const back = `<div class="flex items-center justify-between mb-4"><button onclick="S.smsStep=1;renderSMSPrompt()" class="p-1"><span class="ms text-on-surface-variant">chevron_left</span></button><div class="flex gap-1.5"><span class="w-2 h-2 rounded-full bg-primary/40"></span><span class="w-2 h-2 rounded-full bg-primary"></span></div><div class="w-8"></div></div>`;
+        if (S.smsBillingType === 'recurring') {
+          sc.innerHTML = back + `<p class="font-headline font-semibold text-white text-base mb-5">How often does this charge repeat?</p><div class="space-y-3">
+        ${['monthly', 'quarterly', 'yearly'].map(c => {
+            const sel = S.smsCycle === c; const labels = { monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' }; const subs = { monthly: `${fmt(sms.amount)} every month`, quarterly: `${fmt(sms.amount)} every 3 months`, yearly: `${fmt(sms.amount)} per year` };
+            return `<button onclick="S.smsCycle='${c}';renderSMSPrompt()" class="w-full rounded-full p-4 text-left border transition-all active:scale-95 flex justify-between items-center ${sel ? 'border-primary bg-primary/10' : 'border-outline-variant bg-surface-container-highest'}"><div><span class="font-headline font-semibold ${sel ? 'text-primary' : 'text-white'}">${labels[c]}</span><p class="text-xs text-on-surface-variant">${subs[c]}</p></div></button>`
+          }).join('')}
+      </div>${S.smsCycle ? `<button onclick="completeSMSFlow()" class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-full py-4 font-headline font-bold active:scale-95 transition-transform duration-150 mt-6">Done — Track This Subscription</button>` : ''}`;
+        } else {
+          sc.innerHTML = back + `<p class="font-headline font-semibold text-white text-base mb-5">When does your free trial end?</p>
+        <input type="date" id="trial-date" class="w-full bg-surface-container-highest border border-primary rounded-full px-4 py-4 text-white text-center text-lg font-body focus:outline-none mb-4">
+        <div class="flex items-start gap-2 bg-secondary/10 rounded-xl p-3 border border-secondary/20"><span class="ms text-secondary text-lg">warning</span><p class="text-secondary text-xs">SpendSync will alert you 3 days before this date so you can cancel before being charged.</p></div>
+        <button onclick="completeSMSFlow()" class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-full py-4 font-headline font-bold active:scale-95 transition-transform duration-150 mt-6">Done — Track Trial</button>`;
+        }
+      }
+    }
+    function completeSMSFlow() {
+      const sms = S.pendingSMS; if (!sms) return;
+      if (S.smsBillingType === 'recurring' && !S.smsCycle) return showGenericToast('error', 'Please select a billing cycle');
+      if (S.smsBillingType === 'trial' && !$('#trial-date')?.value) return showGenericToast('error', 'Please select trial end date');
+      S.subscriptions.push({ id: 'sub-' + Date.now(), name: sms.merchant, cardId: sms.cardId, amount: S.smsBillingType === 'trial' ? 0 : sms.amount, billingType: S.smsBillingType, cycle: S.smsBillingType === 'trial' ? null : S.smsCycle, renewalDays: S.smsBillingType === 'trial' ? 7 : 30, category: 'Other', icon: 'subscriptions', status: S.smsBillingType === 'trial' ? 'trial-urgent' : 'safe', trialEndsAmount: S.smsBillingType === 'trial' ? sms.amount : undefined });
+      S.smsQueue.shift(); closeSMSPrompt();
+      setTimeout(() => { navigate('dashboard'); showGenericToast('success', `${sms.merchant} added successfully!`) }, 500);
+    }
+
+    /* ═══ NAVIGATION ═══ */
+    function navigate(target, data) {
+      $$('.screen').forEach(s => { s.classList.add('hidden'); s.classList.remove('active') });
+      const el = $('#screen-' + target); el.classList.remove('hidden'); el.classList.add('active');
+      S.currentScreen = target; if (data?.cardId) S.selectedCardId = data.cardId;
+      renderScreen(target); updateBottomNav(target);
+      $('#floating-bar').classList.toggle('hidden', target !== 'subscriptions');
+      window.scrollTo(0, 0);
+    }
+    function renderScreen(t) {
+      const fn = { dashboard: renderDashboard, subscriptions: renderSubscriptions, 'add-card': renderAddCard, analytics: renderAnalytics, alerts: renderAlerts, advisor: renderAdvisor, dna: renderDNA };
+      if (fn[t]) fn[t]();
+    }
+
+    /* ═══ HEADER ═══ */
+    function renderHeader(mode, title) {
+      const h = $('#header-inner');
+      if (mode === 'home') {
+        h.innerHTML = `<div class="flex items-center gap-3"><span class="ms-fill text-primary">account_balance_wallet</span><span class="text-xl font-bold tracking-tight text-primary font-headline">SpendSync</span></div>
+    <div class="flex items-center gap-4"><button onclick="navigate('alerts')" class="hover:bg-surface-container-high transition-colors p-2 rounded-full active:scale-95 duration-200 relative"><span class="ms text-primary">notifications</span><span class="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white font-bold flex items-center justify-center">3</span></button></div>`;
+      } else {
+        h.innerHTML = `<button onclick="navigate('dashboard')" class="hover:bg-surface-container-high transition-colors p-2 rounded-full active:scale-95 duration-200"><span class="ms text-primary">arrow_back</span></button>
+    <span class="text-xl font-bold tracking-tight text-primary font-headline">${title || ''}</span>
+    <button onclick="navigate('alerts')" class="hover:bg-surface-container-high transition-colors p-2 rounded-full active:scale-95 duration-200"><span class="ms text-primary">notifications</span></button>`;
+      }
+    }
+
+    /* ═══ BOTTOM NAV ═══ */
+    function updateBottomNav(active) {
+      const tabs = [{ label: 'Dashboard', icon: 'dashboard', target: 'dashboard' }, { label: 'Cards', icon: 'credit_card', target: 'add-card' }, { label: 'Analytics', icon: 'insert_chart', target: 'analytics' }, { label: 'Alerts', icon: 'notifications_active', target: 'alerts' }];
+      $('#bottom-nav').innerHTML = tabs.map(t => {
+        const a = active === t.target;
+        return `<div onclick="navigate('${t.target}')" class="nav-tab flex flex-col items-center justify-center ${a ? 'bg-surface-container-highest text-primary rounded-xl px-4 py-1' : 'text-primary-container px-4 py-1 hover:text-primary'} transition-all duration-300 tap-highlight-none cursor-pointer">
+      <span class="ms mb-1">${t.icon}</span><span class="font-medium text-[10px] tracking-wide uppercase font-body">${t.label}</span></div>`
+      }).join('');
+    }
+
+    /* ═══ CARD RENDERER ═══ */
+    function stackedCardHTML(card, pos, subs) {
+      const spend = subs.reduce((a, s) => a + (s.billingType === 'trial' ? 0 : s.amount), 0);
+      return `<div onclick="navigate('subscriptions',{cardId:'${card.id}'})" class="stacked-card absolute ${pos} w-full h-56 rounded-full p-6 flex flex-col justify-between shadow-2xl bg-gradient-to-br ${card.gradient} border border-white/5 cursor-pointer">
+    <div class="flex justify-between items-start"><span class="ms-fill text-white/70 text-2xl">account_balance_wallet</span><span class="bg-black/30 backdrop-blur-md text-white px-3 py-1 rounded-full text-[10px] font-bold font-label uppercase tracking-wider">${fmt(spend)}/mo</span></div>
+    <div><p class="text-white/40 text-[10px] tracking-[0.3em] font-label mb-1">${card.variant}</p><p class="text-white text-lg font-headline font-bold tracking-[0.2em]">XXXX XXXX XXXX ${card.last4}</p></div></div>`;
+    }
+    function heroCardHTML(card, subs) {
+      const spend = subs.reduce((a, s) => a + (s.billingType === 'trial' ? 0 : s.amount), 0);
+      return `<div class="relative overflow-hidden rounded-full p-8 editorial-shadow bg-gradient-to-br ${card.gradient} flex flex-col justify-between h-48 border border-white/5">
+    <div class="flex justify-between items-start"><span class="ms-fill text-white/90 text-4xl">account_balance_wallet</span><div class="text-right"><p class="font-label text-xs uppercase tracking-widest text-white/60 mb-1">Available Limit</p><p class="font-headline text-2xl font-bold text-white tracking-tight">₹4,20,000</p></div></div>
+    <div class="flex justify-between items-end"><div class="flex gap-2"><span class="bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 font-label text-[10px] font-semibold text-white uppercase tracking-wider">${subs.length} Active Subscriptions</span><span class="bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 font-label text-[10px] font-semibold text-white uppercase tracking-wider">${fmt(spend)}/month</span></div><span class="font-headline text-white/80 font-medium tracking-[0.2em]">•••• ${card.last4}</span></div></div>`;
+    }
+
+    /* ═══ DASHBOARD ═══ */
+    function renderDashboard() {
+      renderHeader('home');
+      const total = totalMonthly(); const yearly = total * 12; const sc = subCount();
+      const positions = ['top-0 z-40', 'top-14 z-30', 'top-[7rem] z-20', 'top-40 z-10'];
+      const reversed = [...S.cards].reverse();
+      const stackH = 160 + (S.cards.length - 1) * 56 + 64;
+      $('#screen-dashboard').innerHTML = `<div class="max-w-sm mx-auto px-6 pt-8 pb-32">
+    <div class="mb-10"><h1 class="font-headline text-3xl font-extrabold tracking-tight text-white mb-1">Good morning, Rahul</h1><p class="text-on-surface-variant font-body text-sm">You have ${S.cards.length} active cards and ${sc} subscriptions</p></div>
+    <div class="bg-surface-container-low p-8 rounded-full border border-outline-variant/15 relative overflow-hidden group mb-10">
+      <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors duration-700"></div>
+      <div class="relative z-10 flex flex-col items-center text-center">
+        <p class="font-label text-xs uppercase tracking-[0.2em] text-on-surface-variant mb-3">Total Monthly Spend</p>
+        <div class="flex items-baseline gap-1 mb-2"><span class="text-2xl font-headline font-bold text-primary">₹</span><span id="hero-num" class="text-6xl font-headline font-extrabold text-white tracking-tighter">${total.toLocaleString('en-IN')}</span></div>
+        <div class="bg-surface-container-highest/50 px-4 py-1.5 rounded-full backdrop-blur-md"><span class="text-on-surface-variant font-label text-[11px] font-medium tracking-wide">TOTAL YEARLY</span><span class="text-primary-dim font-bold ml-1">${fmt(yearly)}</span></div>
+      </div>
+    </div>
+    <div class="flex justify-between items-end mb-6 px-1"><span class="font-headline font-bold text-lg text-white">Your Wallet</span><span class="text-primary text-xs font-semibold tracking-wider uppercase border-b border-outline-variant/30 pb-0.5 cursor-pointer">Manage All</span></div>
+    <div class="relative w-full mt-4 mb-10" style="height:${stackH}px">${reversed.map((c, i) => stackedCardHTML(c, positions[i], subsFor(c.id))).join('')}</div>
+    <div class="bg-surface-container-high p-5 rounded-full flex items-center gap-4 mb-10">
+      <div class="bg-primary/10 p-3 rounded-full"><span class="ms text-primary">auto_awesome</span></div>
+      <div class="flex-1"><p class="text-white font-headline font-bold text-sm">Optimization Ready</p><p class="text-on-surface-variant text-xs">3 subscriptions have price drops available.</p></div>
+      <button onclick="navigate('advisor')" class="ml-auto bg-primary text-on-primary font-label font-bold text-[10px] uppercase tracking-widest px-4 py-2 rounded-full active:scale-95 transition-transform">Review</button>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mb-8">
+      <button onclick="navigate('advisor')" class="bg-surface-container p-4 rounded-full flex items-center gap-3 active:scale-95 transition-transform border border-outline-variant/15"><span class="ms text-primary">auto_awesome</span><span class="font-headline font-bold text-sm">Card Advisor</span></button>
+      <button onclick="navigate('dna')" class="bg-surface-container p-4 rounded-full flex items-center gap-3 active:scale-95 transition-transform border border-outline-variant/15"><span class="ms text-primary">fingerprint</span><span class="font-headline font-bold text-sm">Your DNA</span></button>
+    </div>
+    <div class="mt-8 mb-8"><button id="sim-btn" onclick="simulateSMS()" class="w-full bg-gradient-to-r from-secondary to-secondary-dim text-on-secondary font-headline font-bold py-4 rounded-full flex items-center justify-center gap-3 active:scale-95 transition-transform duration-150 shadow-lg"><span class="ms text-lg">sms</span>Simulate Incoming SMS</button></div>
+  </div>`;
+      setTimeout(() => { const el = $('#hero-num'); if (el) countUp(el, total) }, 300);
+    }
+
+    /* ═══ SUBSCRIPTIONS (Card Detail) ═══ */
+    function renderSubscriptions() {
+      const card = S.cards.find(c => c.id === S.selectedCardId) || S.cards[0];
+      const subs = subsFor(card.id); const spend = subs.reduce((a, s) => a + (s.billingType === 'trial' ? 0 : s.amount), 0);
+      renderHeader('detail', card.variant || card.bank);
+      $('#float-amount').textContent = fmt(spend); $('#floating-bar').classList.remove('hidden');
+      $('#screen-subscriptions').innerHTML = `<div class="max-w-sm mx-auto px-6 pt-6 pb-32">
+    <div class="mb-8">${heroCardHTML(card, subs)}</div>
+    <div class="flex justify-between items-end mb-6 px-1"><span class="font-headline font-bold text-lg text-white">Active Subscriptions</span><span class="text-primary text-xs font-semibold tracking-wider uppercase">Manage All</span></div>
+    <div class="space-y-4">${subs.map(s => {
+        const st = statusStyle[s.status]; const amtText = s.billingType === 'trial' ? 'Free' : fmt(s.amount); const subLabel = s.billingType === 'trial' ? 'Free Trial' : (s.cycle ? s.cycle.charAt(0).toUpperCase() + s.cycle.slice(1) + ' Plan' : ''); const pillLabel = s.billingType === 'trial' ? `Trial ends in ${s.renewalDays} days` : `Renews in ${s.renewalDays} days${s.status === 'urgent' ? ' — Urgent' : ''}`;
+        return `<div class="group bg-surface-container hover:bg-surface-container-high transition-all duration-300 rounded-full p-4 flex items-center justify-between relative border-l-4 ${st.border} cursor-pointer">
+        <div class="flex items-center gap-3"><div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center"><span class="ms-fill ${st.icon}">${s.icon}</span></div><div><p class="font-headline font-bold text-on-surface">${s.name}</p><p class="font-body text-xs text-on-surface-variant">${subLabel}</p></div></div>
+        <div class="text-right"><p class="font-headline font-bold text-on-surface">${amtText}${s.billingType !== 'trial' ? '<span class="text-[10px] text-on-surface-variant font-normal">/mo</span>' : ''}</p><span class="inline-block px-3 py-1 mt-1 ${st.pill} rounded-full font-label text-[10px] font-semibold uppercase tracking-tighter">${pillLabel}</span></div></div>`
+      }).join('')}
+    </div>
+  </div>`;
+    }
+
+    /* ═══ ADD CARD ═══ */
+    function renderAddCard() {
+      renderHeader('detail', 'Add New Card');
+      const c = S.newCard; const g = gradientFor(c.bank); const digits = c.lastFour.padEnd(4, '_');
+      $('#screen-add-card').innerHTML = `<div class="max-w-sm mx-auto px-6 pt-6 pb-32">
+    <div class="rounded-full p-6 h-52 flex flex-col justify-between bg-gradient-to-br ${g} border border-white/5 shadow-2xl mb-8">
+      <div class="flex justify-between items-start"><p class="text-white/70 font-headline font-bold text-sm">${c.bank || 'Select Bank'}</p><p class="text-white/50 text-xs font-label">${c.network}</p></div>
+      <div><p class="text-white/40 text-[10px] tracking-[0.3em] font-label mb-1">${c.variant || 'CARD VARIANT'}</p><p class="text-white text-lg font-headline font-bold tracking-[0.2em]">XXXX XXXX XXXX ${digits}</p><p class="text-white/50 text-xs mt-2 font-label">${c.expiry || 'MM/YY'}</p></div>
+    </div>
+    <div class="space-y-5">
+      <div><label class="text-on-surface-variant text-xs font-label uppercase tracking-wider mb-2 block">Bank Name</label><select onchange="S.newCard.bank=this.value;renderAddCard()" class="w-full bg-surface-container border border-outline-variant rounded-full px-4 py-3 text-white font-body focus:border-primary outline-none"><option value="">Select Bank</option><option ${c.bank === 'HDFC Bank' ? 'selected' : ''}>HDFC Bank</option><option ${c.bank === 'ICICI Bank' ? 'selected' : ''}>ICICI Bank</option><option ${c.bank === 'State Bank of India' ? 'selected' : ''}>State Bank of India</option><option ${c.bank === 'Axis Bank' ? 'selected' : ''}>Axis Bank</option><option ${c.bank === 'Kotak Mahindra Bank' ? 'selected' : ''}>Kotak Mahindra Bank</option><option ${c.bank === 'Yes Bank' ? 'selected' : ''}>Yes Bank</option><option ${c.bank === 'IndusInd Bank' ? 'selected' : ''}>IndusInd Bank</option><option ${c.bank === 'Other' ? 'selected' : ''}>Other</option></select></div>
+      <div><label class="text-on-surface-variant text-xs font-label uppercase tracking-wider mb-2 block">Card Variant</label><input value="${c.variant}" oninput="S.newCard.variant=this.value;renderAddCard()" placeholder="e.g. Regalia, Sapphire" class="w-full bg-surface-container border border-outline-variant rounded-full px-4 py-3 text-white font-body focus:border-primary outline-none"></div>
+      <div><label class="text-on-surface-variant text-xs font-label uppercase tracking-wider mb-2 block">Last 4 Digits</label><input value="${c.lastFour}" oninput="S.newCard.lastFour=this.value.replace(/[^0-9]/g,'').slice(0,4);renderAddCard()" maxlength="4" inputmode="numeric" placeholder="1234" class="w-full bg-surface-container border border-outline-variant rounded-full px-4 py-3 text-white font-body focus:border-primary outline-none"></div>
+      <div><label class="text-on-surface-variant text-xs font-label uppercase tracking-wider mb-2 block">Expiry Date</label><input value="${c.expiry}" oninput="handleExpiry(this)" placeholder="MM/YY" maxlength="5" class="w-full bg-surface-container border border-outline-variant rounded-full px-4 py-3 text-white font-body focus:border-primary outline-none"></div>
+      <div><label class="text-on-surface-variant text-xs font-label uppercase tracking-wider mb-2 block">Network</label><div class="flex gap-3">${['Visa', 'Mastercard', 'RuPay'].map(n => `<button onclick="S.newCard.network='${n}';renderAddCard()" class="flex-1 py-3 rounded-full font-label font-semibold text-sm ${c.network === n ? 'bg-primary text-on-primary' : 'bg-surface-container border border-outline-variant text-on-surface-variant'} active:scale-95">${n}</button>`).join('')}</div></div>
+      <button onclick="addCard()" class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-full py-4 font-headline font-bold active:scale-95 transition-transform duration-150 mt-4">Add Card</button>
+    </div>
+  </div>`;
+    }
+    function handleExpiry(el) { let v = el.value.replace(/\D/g, ''); if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2); S.newCard.expiry = v; el.value = v }
+    function addCard() {
+      const c = S.newCard; if (!c.bank || c.lastFour.length !== 4 || !c.expiry) return showGenericToast('error', 'Please fill all fields');
+      S.cards.push({ id: 'card-' + Date.now(), bank: c.bank, variant: c.variant, last4: c.lastFour, expiry: c.expiry, network: c.network, gradient: gradientFor(c.bank), monthlySpend: 0 });
+      S.newCard = { bank: '', variant: '', lastFour: '', expiry: '', network: 'Visa' };
+      navigate('dashboard'); showGenericToast('success', 'Card added successfully');
+    }
+
+    /* ═══ ANALYTICS ═══ */
+    /* ═══ ANALYTICS ═══ */
+    function renderAnalytics() {
+      renderHeader('detail', 'Analytics');
+      const cats = [{ name: 'Food', pct: 30, amt: 1004, hex: '#FF6D00', bg: 'bg-chart-1', text: 'text-chart-1', icon: 'restaurant' }, { name: 'Travel', pct: 20, amt: 669, hex: '#00BFA5', bg: 'bg-chart-2', text: 'text-chart-2', icon: 'directions_car' }, { name: 'Shopping', pct: 25, amt: 836, hex: '#304FFE', bg: 'bg-chart-3', text: 'text-chart-3', icon: 'shopping_bag' }, { name: 'Subs', pct: 15, amt: 502, hex: '#F50057', bg: 'bg-chart-4', text: 'text-chart-4', icon: 'subscriptions' }, { name: 'Bills', pct: 10, amt: 335, hex: '#FFD600', bg: 'bg-chart-5', text: 'text-chart-5', icon: 'receipt' }];
+      const weeks = [{ h: '40%', val: '' }, { h: '65%', val: '' }, { h: '95%', val: '₹1,240', peak: true }, { h: '55%', val: '' }, { h: '45%', val: '' }];
+      const txns = [{ name: 'Amazon India', date: '12 Mar • Axis Card', amt: '-₹499', icon: 'shopping_cart' }, { name: 'Starbucks', date: '10 Mar • HDFC Card', amt: '-₹245', icon: 'lunch_dining' }, { name: 'Uber', date: '08 Mar • ICICI Card', amt: '-₹180', icon: 'commute' }];
+
+      // Donut segments
+      const circ = 251.2;
+      const segData = [{ offset: 175, rot: 0 }, { offset: 200, rot: 108 }, { offset: 188, rot: 180 }, { offset: 213, rot: 270 }, { offset: 226, rot: 324 }];
+
+      $('#screen-analytics').innerHTML = `<div class="max-w-sm mx-auto px-6 pt-4 pb-32 space-y-8">
+    <!-- Header with month picker -->
+    <div class="flex justify-between items-center">
+      <h1 class="font-headline text-3xl font-extrabold tracking-tight text-white">Analytics</h1>
+      <div class="flex items-center gap-3 bg-surface-container border border-white/10 rounded-full px-4 py-2">
+        <span class="ms text-sm text-on-surface-variant cursor-pointer">chevron_left</span>
+        <span class="text-sm font-semibold tracking-wide uppercase font-headline">Mar 2026</span>
+        <span class="ms text-sm text-on-surface-variant cursor-pointer">chevron_right</span>
+      </div>
+    </div>
+
+    <!-- Donut Chart -->
+    <div class="flex flex-col items-center">
+      <div class="relative w-[240px] h-[240px]">
+        <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+          ${cats.map((c, i) => `<circle cx="50" cy="50" r="40" fill="transparent" stroke="${c.hex}" stroke-dasharray="${circ}" stroke-dashoffset="${segData[i].offset}" stroke-width="8" ${segData[i].rot ? `transform="rotate(${segData[i].rot} 50 50)"` : ''}/>`).join('')}
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+          <span class="text-[10px] text-on-surface-variant font-medium tracking-widest uppercase">Spent</span>
+          <span class="text-3xl font-headline font-extrabold">₹3,347</span>
+        </div>
+      </div>
+      <div class="w-full overflow-x-auto hide-scroll mt-6">
+        <div class="flex gap-6 pb-2 min-w-max px-2">${cats.map(c => `<div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full ${c.bg}"></div><span class="text-xs font-medium text-on-surface whitespace-nowrap">${c.name} ${c.pct}%</span></div>`).join('')}</div>
+      </div>
+    </div>
+
+    <!-- Weekly Distribution Bar Chart -->
+    <div class="h-[220px] flex flex-col justify-end">
+      <h4 class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-6 px-1">Weekly Distribution</h4>
+      <div class="relative flex items-end justify-between gap-3 h-full px-2" style="border-bottom:1px solid rgba(255,255,255,0.05)">
+        <div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
+          <div class="w-full" style="border-top:1px solid white"></div>
+          <div class="w-full" style="border-top:1px solid white"></div>
+          <div class="w-full" style="border-top:1px solid white"></div>
+          <div class="w-full" style="border-top:1px solid white"></div>
+        </div>
+        ${weeks.map(w => `<div class="flex-1 ${w.peak ? 'bg-chart-1 shadow-[0_0_20px_rgba(255,109,0,0.3)]' : 'bg-chart-1/30'} rounded-t-lg transition-all relative" style="height:${w.h}">${w.peak ? `<div class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold whitespace-nowrap">${w.val}</div>` : ''}</div>`).join('')}
+      </div>
+      <div class="flex justify-between mt-3 px-2">${['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'].map(w => `<span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tighter">${w}</span>`).join('')}</div>
+    </div>
+
+    <!-- Spending Insight Banner -->
+    <div class="bg-primary/10 rounded-2xl p-4 flex items-center gap-4 border border-primary/20">
+      <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary"><span class="ms">trending_up</span></div>
+      <div><p class="text-sm font-medium text-primary">Spending Insight</p><p class="text-xs text-white/80">You spent <span class="font-bold">12% more</span> than last month.</p></div>
+    </div>
+
+    <!-- Top Categories -->
+    <div>
+      <h3 class="font-headline text-lg font-bold mb-5 flex items-center gap-2">Top Categories</h3>
+      <div class="space-y-6">${cats.slice(0, 3).map(c => `<div class="space-y-2">
+        <div class="flex justify-between items-center"><div class="flex items-center gap-3"><span class="ms ${c.text}">${c.icon}</span><span class="text-sm font-semibold">${c.name === 'Food' ? 'Food & Dining' : c.name}</span></div><span class="text-sm font-bold">${fmt(c.amt)}</span></div>
+        <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden"><div class="h-full ${c.bg}" style="width:${c.pct}%"></div></div>
+      </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div>
+      <div class="flex justify-between items-center mb-5"><h3 class="font-headline text-lg font-bold">Recent Transactions</h3><button class="text-xs font-bold text-primary uppercase tracking-wider">See All</button></div>
+      <div class="space-y-1">${txns.map(t => `<div class="flex items-center justify-between py-4" style="border-bottom:1px solid rgba(255,255,255,0.05)">
+        <div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-surface border border-white/5 flex items-center justify-center"><span class="ms text-on-surface-variant">${t.icon}</span></div><div><p class="text-sm font-bold">${t.name}</p><p class="text-[10px] text-on-surface-variant font-medium">${t.date}</p></div></div>
+        <p class="font-bold text-sm">${t.amt}</p></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+    }
+
+    /* ═══ ALERTS ═══ */
+    function renderAlerts() {
+      renderHeader('home');
+      const filters = [{ id: 'all', label: 'All' }, { id: 'urgent', label: 'Urgent' }, { id: 'trials', label: 'Trials' }];
+      let subs = [...S.subscriptions].sort((a, b) => a.renewalDays - b.renewalDays);
+      if (S.alertFilter === 'urgent') subs = subs.filter(s => s.status === 'urgent' || s.status === 'trial-urgent');
+      if (S.alertFilter === 'trials') subs = subs.filter(s => s.billingType === 'trial');
+      $('#screen-alerts').innerHTML = `<div class="max-w-sm mx-auto px-6 pt-6 pb-32">
+    <div class="bg-surface-container-highest/60 backdrop-blur-md rounded-full p-1 pl-1 pr-4 flex items-center gap-3 border border-outline-variant/20 editorial-shadow mb-10">
+      <div class="w-10 h-10 bg-gradient-to-br from-primary to-primary-container rounded-full flex items-center justify-center"><span class="ms-fill text-on-primary text-[20px]">auto_awesome</span></div>
+      <div class="flex-1 min-w-0"><p class="text-[11px] font-bold font-headline tracking-wider text-primary uppercase">SpendSync Intelligence</p><p class="text-sm text-on-surface truncate">Netflix renews in 3 days — ₹649 on HDFC ••4521</p></div>
+      <span class="text-[10px] text-on-surface-variant font-medium">Now</span>
+    </div>
+    <h1 class="text-4xl font-extrabold font-headline tracking-tight mb-2">Upcoming Alerts</h1>
+    <p class="text-on-surface-variant font-body text-lg mb-8">3 subscriptions need your attention this week</p>
+    <div class="flex gap-2 mb-8">${filters.map(f => `<button onclick="S.alertFilter='${f.id}';renderAlerts()" class="${S.alertFilter === f.id ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'} px-5 py-2 rounded-full text-sm font-semibold transition-all active:scale-95">${f.label}</button>`).join('')}</div>
+    <div class="space-y-4">${subs.map(s => {
+        const st = statusStyle[s.status]; const card = S.cards.find(c => c.id === s.cardId); const cardInfo = card ? card.bank.split(' ')[0] + ' ••' + card.last4 : ''; const amtText = s.billingType === 'trial' ? 'Free' : fmt(s.amount);
+        return `<div class="group bg-surface-container rounded-full overflow-hidden transition-all duration-300 hover:bg-surface-container-high editorial-shadow flex items-center p-3 pr-6 relative">
+        <div class="absolute left-0 top-0 bottom-0 w-1 ${st.bar}"></div>
+        <div class="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center mr-4"><span class="ms-fill ${st.icon}">${s.icon}</span></div>
+        <div class="flex-1 min-w-0"><div class="flex items-center gap-2"><p class="font-bold text-base font-headline">${s.name}</p>${s.billingType === 'trial' ? '<span class="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">Trial</span>' : ''}</div><p class="text-xs text-on-surface-variant font-medium uppercase tracking-widest">${cardInfo}</p></div>
+        <div class="text-right"><p class="text-xl font-bold font-headline text-on-surface">${amtText}</p><p class="text-xs font-bold ${st.days} uppercase">in ${s.renewalDays} days</p></div></div>`
+      }).join('')}
+    </div>
+    <div class="mt-10 p-8 border border-dashed border-outline-variant/30 rounded-full flex flex-col items-center text-center"><span class="ms text-4xl text-on-surface-variant/40 mb-3">verified_user</span><p class="text-sm font-medium text-on-surface-variant">No other payments detected for this month.</p></div>
+  </div>`;
+    }
+
+    /* ═══ ADVISOR — Optimal Card Optimizer ═══ */
+    function renderAdvisor() {
+      renderHeader('detail', 'Optimal Card Advisor');
+
+      $('#screen-advisor').innerHTML = `<div class="px-4 md:px-8 max-w-7xl mx-auto space-y-8 pt-4 pb-32">
+    <!-- Search & Filter Section -->
+    <section class="space-y-4">
+      <div class="relative group">
+        <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+          <span class="ms text-outline">search</span>
+        </div>
+        <input class="w-full bg-surface-container-lowest border-none ring-1 ring-outline-variant/15 focus:ring-primary/40 rounded-xl py-4 pl-12 pr-4 font-body text-on-surface placeholder:text-outline transition-all" placeholder="Search merchant (Amazon, Netflix) or category..." type="text">
+      </div>
+      <div class="flex gap-3 overflow-x-auto hide-scroll py-1">
+        <span class="bg-primary text-on-primary font-label font-medium px-4 py-1.5 rounded-full text-sm whitespace-nowrap">All Recommendations</span>
+        <span class="bg-surface-container-high text-on-surface font-label px-4 py-1.5 rounded-full text-sm whitespace-nowrap hover:bg-surface-container-highest transition-colors cursor-pointer">Dining</span>
+        <span class="bg-surface-container-high text-on-surface font-label px-4 py-1.5 rounded-full text-sm whitespace-nowrap hover:bg-surface-container-highest transition-colors cursor-pointer">OTT</span>
+        <span class="bg-surface-container-high text-on-surface font-label px-4 py-1.5 rounded-full text-sm whitespace-nowrap hover:bg-surface-container-highest transition-colors cursor-pointer">Fuel</span>
+        <span class="bg-surface-container-high text-on-surface font-label px-4 py-1.5 rounded-full text-sm whitespace-nowrap hover:bg-surface-container-highest transition-colors cursor-pointer">Travel</span>
+      </div>
+    </section>
+
+    <!-- Smart Pick Section (Bento Grid Style) -->
+    <section class="space-y-4">
+      <div class="flex items-end justify-between px-1">
+        <h2 class="font-headline font-bold text-xl tracking-tight text-white">Smart Pick</h2>
+        <button class="text-primary font-label text-xs uppercase tracking-widest font-semibold border-b border-outline-variant/20 pb-0.5">Compare All</button>
+      </div>
+      <div class="flex gap-4 overflow-x-auto hide-scroll pb-2">
+        <!-- Card 1 -->
+        <div class="min-w-[280px] bg-surface-container rounded-xl p-5 border-l-4 border-secondary flex flex-col justify-between h-44 shadow-lg shrink-0">
+          <div>
+            <div class="flex justify-between items-start">
+              <span class="text-xs font-label uppercase tracking-widest text-outline">Best for OTT</span>
+              <span class="ms-fill text-secondary">stars</span>
+            </div>
+            <h3 class="font-headline font-bold text-lg mt-1 text-on-surface">HDFC Regalia</h3>
+          </div>
+          <div class="flex items-end justify-between">
+            <div>
+              <p class="text-[10px] text-outline uppercase font-medium">Est. Monthly Saving</p>
+              <p class="text-2xl font-headline font-extrabold text-secondary">₹1,240</p>
+            </div>
+            <button class="bg-surface-container-highest p-2 rounded-full hover:bg-surface-bright transition-colors">
+              <span class="ms text-on-surface">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="min-w-[280px] bg-surface-container rounded-xl p-5 border-l-4 border-primary flex flex-col justify-between h-44 shadow-lg shrink-0">
+          <div>
+            <div class="flex justify-between items-start">
+              <span class="text-xs font-label uppercase tracking-widest text-outline">Best for Dining</span>
+              <span class="ms-fill text-primary">restaurant</span>
+            </div>
+            <h3 class="font-headline font-bold text-lg mt-1 text-on-surface">HDFC Regalia</h3>
+          </div>
+          <div class="flex items-end justify-between">
+            <div>
+              <p class="text-[10px] text-outline uppercase font-medium">Est. Monthly Saving</p>
+              <p class="text-2xl font-headline font-extrabold text-primary">₹850</p>
+            </div>
+            <button class="bg-surface-container-highest p-2 rounded-full hover:bg-surface-bright transition-colors">
+              <span class="ms text-on-surface">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="min-w-[280px] bg-surface-container rounded-xl p-5 border-l-4 border-tertiary flex flex-col justify-between h-44 shadow-lg shrink-0">
+          <div>
+            <div class="flex justify-between items-start">
+              <span class="text-xs font-label uppercase tracking-widest text-outline">Best for Online Shopping</span>
+              <span class="ms-fill text-tertiary">shopping_bag</span>
+            </div>
+            <h3 class="font-headline font-bold text-lg mt-1 text-on-surface">ICICI Amazon Pay</h3>
+          </div>
+          <div class="flex items-end justify-between">
+            <div>
+              <p class="text-[10px] text-outline uppercase font-medium">Est. Monthly Saving</p>
+              <p class="text-2xl font-headline font-extrabold text-tertiary">₹2,100</p>
+            </div>
+            <button class="bg-surface-container-highest p-2 rounded-full hover:bg-surface-bright transition-colors">
+              <span class="ms text-on-surface">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Card List -->
+    <section class="space-y-12 pt-4">
+      
+      <!-- HDFC REGALIA CARD -->
+      <article class="bg-surface-container-low rounded-xl overflow-hidden shadow-2xl relative">
+        <div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary rounded-full my-6 ml-1"></div>
+        <header class="p-6 md:p-8 space-y-6">
+          <div class="flex flex-col md:flex-row md:items-center gap-6">
+            <div class="w-full md:w-64 aspect-[1.586/1] rounded-xl overflow-hidden relative shadow-2xl bg-gradient-to-br from-[#1a1a1a] to-[#000000]">
+              <div class="w-full h-full opacity-60 mix-blend-luminosity bg-surface-container flex items-center justify-center border border-white/5"><span class="ms text-4xl text-white/20">credit_card</span></div>
+              <div class="absolute inset-0 p-4 flex flex-col justify-between">
+                <span class="font-headline font-bold text-white opacity-90">REGALIA</span>
+                <div class="flex justify-between items-end">
+                  <span class="font-label text-xs tracking-widest text-white/70">•••• 4829</span>
+                  <div class="w-8 h-5 bg-white/10 rounded-sm"></div>
+                </div>
+              </div>
+            </div>
+            <div class="flex-1 space-y-3">
+              <div class="flex items-center gap-2">
+                <h3 class="font-headline font-bold text-3xl text-white">HDFC Regalia</h3>
+                <span class="bg-secondary/10 text-secondary text-[10px] font-bold px-2 py-0.5 rounded border border-secondary/20">ACTIVE</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <span class="bg-surface-container-highest text-on-surface px-3 py-1 rounded-full text-xs font-medium border border-white/5">Best for Travel and Dining</span>
+                <span class="bg-surface-container-highest text-on-surface px-3 py-1 rounded-full text-xs font-medium border border-white/5">Luxury Rewards</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-gradient-to-r from-primary to-primary-container p-6 rounded-xl flex items-center justify-between group overflow-hidden relative">
+            <div class="relative z-10">
+              <p class="text-on-primary font-label text-[10px] uppercase font-bold tracking-[0.2em] mb-1">Top Benefit</p>
+              <h4 class="text-on-primary font-headline font-extrabold text-2xl md:text-3xl leading-tight">5X Reward points on all dining spends</h4>
+            </div>
+            <span class="ms text-6xl text-white/10 absolute -right-2 transform group-hover:scale-110 transition-transform duration-500">restaurant</span>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
+            <!-- Breakdown Table -->
+            <div class="space-y-4">
+              <h5 class="font-label text-xs uppercase tracking-widest font-bold text-outline">Cashback &amp; Rewards</h5>
+              <div class="bg-surface-container rounded-xl overflow-hidden border border-white/5">
+                <table class="w-full text-left text-sm font-body">
+                  <tbody>
+                    <tr class="border-b border-outline-variant/10"><td class="p-4 text-outline">OTT</td><td class="p-4 text-right font-bold text-secondary">10% Points</td></tr>
+                    <tr class="border-b border-outline-variant/10"><td class="p-4 text-outline">Dining</td><td class="p-4 text-right font-bold text-secondary">5.0% Points</td></tr>
+                    <tr class="border-b border-outline-variant/10"><td class="p-4 text-outline">Travel &amp; Hotel</td><td class="p-4 text-right font-bold text-primary">2.0% Points</td></tr>
+                    <tr class="border-b border-outline-variant/10"><td class="p-4 text-outline">Grocery</td><td class="p-4 text-right font-bold text-outline-variant">0.5% Points</td></tr>
+                    <tr><td class="p-4 text-outline">Amazon / Online</td><td class="p-4 text-right font-bold text-primary">1.5% Points</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Rewards Analytics -->
+            <div class="space-y-4">
+              <div class="flex justify-between items-center">
+                <h5 class="font-label text-xs uppercase tracking-widest font-bold text-outline">Rewards Analytics</h5>
+                <div class="flex items-center gap-1 text-error text-[10px] font-bold"><span class="ms text-xs">warning</span>POINTS EXPIRE IN 45 DAYS</div>
+              </div>
+              <div class="bg-surface-container rounded-xl p-5 space-y-6 border border-white/5">
+                <div class="flex justify-between items-end">
+                  <div><p class="text-xs text-outline mb-1">Points Balance</p><p class="text-3xl font-headline font-bold text-white">12,450</p></div>
+                  <div class="text-right"><p class="text-xs text-outline mb-1">Redeemable Value</p><p class="text-2xl font-headline font-bold text-secondary">₹6,225</p></div>
+                </div>
+                <div class="bg-surface-container-highest rounded-lg p-3 space-y-2">
+                  <p class="text-[10px] text-outline font-bold uppercase tracking-widest">Best Value Redemption</p>
+                  <div class="flex justify-between items-center"><span class="text-sm font-medium text-white">Flights &amp; Travel</span><span class="text-sm font-bold text-secondary">1 Point = ₹0.50</span></div>
+                  <div class="w-full bg-surface-container-low h-1 rounded-full overflow-hidden"><div class="bg-secondary h-full w-[100%]"></div></div>
+                  <div class="flex justify-between items-center opacity-50"><span class="text-xs text-white">Shopping Voucher</span><span class="text-xs font-bold text-white">1 Point = ₹0.20</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Features Row -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+            <div class="space-y-3">
+              <p class="text-[10px] text-outline font-bold uppercase tracking-widest">Redeem At</p>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="bg-surface-container p-3 rounded-xl flex items-center justify-center grayscale hover:grayscale-0 transition-all cursor-pointer border border-white/5"><span class="font-headline font-extrabold text-[10px] text-on-surface/40">SMARTBUY</span></div>
+                <div class="bg-surface-container p-3 rounded-xl flex items-center justify-center grayscale hover:grayscale-0 transition-all cursor-pointer border border-white/5"><span class="font-headline font-extrabold text-[10px] text-on-surface/40">APPLE PRO</span></div>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center"><p class="text-[10px] text-outline font-bold uppercase tracking-widest">Lounge Access</p><span class="ms text-sm text-primary">local_airport</span></div>
+              <div class="bg-surface-container p-4 rounded-xl space-y-3 border border-white/5">
+                <div class="flex justify-between items-end"><p class="text-xl font-headline font-bold text-white">3 <span class="text-xs font-label text-outline">/ 8 Used</span></p><p class="text-[10px] text-outline">PRIORITY PASS</p></div>
+                <div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden"><div class="bg-primary h-full w-[37.5%]"></div></div>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <p class="text-[10px] text-outline font-bold uppercase tracking-widest">Milestone Goal</p>
+              <div class="bg-surface-container p-4 rounded-xl space-y-3 border border-white/5">
+                <p class="text-xs leading-relaxed text-outline">Spend <span class="font-bold text-on-surface">₹63,000</span> more to unlock <span class="text-primary font-bold">10,000 Bonus Points</span></p>
+                <div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden"><div class="bg-gradient-to-r from-primary to-secondary h-full w-[70%]"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <footer class="mt-8 border-t border-outline-variant/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+              <div class="text-center md:text-left"><p class="text-[10px] text-outline uppercase font-bold tracking-widest mb-1">Annual Fee</p><p class="text-lg font-headline font-bold text-error">₹2,500</p></div>
+              <span class="text-outline text-xl font-light">-</span>
+              <div class="text-center md:text-left"><p class="text-[10px] text-outline uppercase font-bold tracking-widest mb-1">Realized Benefit</p><p class="text-lg font-headline font-bold text-secondary">₹18,450</p></div>
+            </div>
+            <div class="bg-secondary/10 border border-secondary/20 px-6 py-2 rounded-full"><p class="text-sm font-medium text-white">Net Saving: <span class="font-headline font-bold text-secondary">₹15,950</span></p></div>
+          </footer>
+        </header>
+      </article>
+
+      <!-- ICICI AMAZON PAY CARD -->
+      <article class="bg-surface-container-low rounded-xl overflow-hidden shadow-2xl relative">
+        <div class="absolute left-0 top-0 bottom-0 w-1 bg-tertiary rounded-full my-6 ml-1"></div>
+        <header class="p-6 md:p-8 space-y-6">
+          <div class="flex flex-col md:flex-row md:items-center gap-6">
+            <div class="w-full md:w-64 aspect-[1.586/1] rounded-xl overflow-hidden relative shadow-2xl bg-[#141B24]">
+              <div class="w-full h-full opacity-30 mix-blend-screen bg-tertiary/20 flex items-center justify-center"><span class="ms text-4xl text-tertiary/40">shopping_bag</span></div>
+              <div class="absolute inset-0 p-4 flex flex-col justify-between">
+                <div class="flex justify-between items-start"><span class="font-headline font-extrabold text-white/90 text-lg italic tracking-wider">AMAZON PAY</span><span class="ms text-white/50">contactless</span></div>
+                <div class="flex justify-between items-end"><span class="font-label text-xs tracking-widest text-white/70">•••• 1102</span><span class="font-bold text-tertiary text-[10px] tracking-wider">ICICI BANK</span></div>
+              </div>
+            </div>
+            <div class="flex-1 space-y-3">
+              <div class="flex items-center gap-2">
+                <h3 class="font-headline font-bold text-3xl text-white">ICICI Amazon Pay</h3>
+                <span class="bg-tertiary/10 text-tertiary text-[10px] font-bold px-2 py-0.5 rounded border border-tertiary/20">ELITE</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <span class="bg-surface-container-highest text-on-surface px-3 py-1 rounded-full text-xs font-medium border border-white/5">Best for Amazon Spends</span>
+                <span class="bg-surface-container-highest text-on-surface px-3 py-1 rounded-full text-xs font-medium border border-white/5">Unlimited Cashback</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-r from-tertiary to-error p-6 rounded-xl flex items-center justify-between group overflow-hidden relative">
+            <div class="relative z-10">
+              <p class="text-on-tertiary font-label text-[10px] uppercase font-bold tracking-[0.2em] mb-1">Top Benefit</p>
+              <h4 class="text-on-tertiary font-headline font-extrabold text-2xl md:text-3xl leading-tight">5% Flat Cashback on Amazon Purchases</h4>
+            </div>
+            <span class="ms text-6xl text-on-tertiary/10 absolute -right-2 transform group-hover:scale-110 transition-transform duration-500">shopping_cart</span>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
+            <div class="space-y-4">
+              <h5 class="font-label text-xs uppercase tracking-widest font-bold text-outline">Earning Rates</h5>
+              <div class="bg-surface-container rounded-xl overflow-hidden border border-white/5">
+                <table class="w-full text-left text-sm font-body">
+                  <tbody>
+                    <tr class="border-b border-outline-variant/10"><td class="p-4 text-outline">Amazon Shopping</td><td class="p-4 text-right font-bold text-tertiary">5.0% Cashback</td></tr>
+                    <tr class="border-b border-outline-variant/10"><td class="p-4 text-outline">Amazon Flights/Pay</td><td class="p-4 text-right font-bold text-tertiary">2.0% Cashback</td></tr>
+                    <tr class="border-b border-outline-variant/10"><td class="p-4 text-outline">Partner Merchants</td><td class="p-4 text-right font-bold text-primary">2.0% Cashback</td></tr>
+                    <tr><td class="p-4 text-outline">Offline Spends</td><td class="p-4 text-right font-bold text-outline-variant">1.0% Cashback</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="space-y-4">
+              <div class="flex justify-between items-center"><h5 class="font-label text-xs uppercase tracking-widest font-bold text-outline">Cashback Wallet</h5><span class="text-secondary text-[10px] font-bold">NO EXPIRY</span></div>
+              <div class="bg-surface-container rounded-xl p-5 h-full flex flex-col justify-center border border-white/5">
+                <p class="text-xs text-outline mb-1">Total Savings This Year</p>
+                <p class="text-5xl font-headline font-extrabold text-white tracking-tighter">₹24,102</p>
+                <div class="mt-4 flex items-center gap-2 text-xs">
+                  <span class="bg-tertiary/20 text-tertiary p-1 rounded"><span class="ms text-[14px]">trending_up</span></span>
+                  <span class="text-outline">+₹2,100 from last month</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <footer class="mt-8 border-t border-outline-variant/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+              <div class="text-center md:text-left"><p class="text-[10px] text-outline uppercase font-bold tracking-widest mb-1">Lifetime Fee</p><p class="text-lg font-headline font-bold text-primary">₹0</p></div>
+            </div>
+            <div class="bg-tertiary/10 border border-tertiary/20 px-6 py-2 rounded-full"><p class="text-sm font-medium text-white">Net Value: <span class="font-headline font-bold text-tertiary">ULTIMATE</span></p></div>
+          </footer>
+        </header>
+      </article>
+
+      <!-- Placeholders for layout completeness -->
+      <article class="bg-surface-container/30 border border-outline-variant/10 rounded-xl p-8 flex items-center justify-between opacity-60 grayscale hover:grayscale-0 transition-all group cursor-pointer">
+        <div class="flex items-center gap-6">
+          <div class="w-16 h-10 bg-blue-900/40 rounded border border-blue-400/20"></div>
+          <div><h3 class="font-headline font-bold text-xl text-white">SBI SimplyCLICK</h3><p class="text-xs text-outline">Best for Online Shopping &amp; Rewards</p></div>
+        </div>
+        <span class="ms text-outline group-hover:text-primary transition-colors">expand_more</span>
+      </article>
+      <article class="bg-surface-container/30 border border-outline-variant/10 rounded-xl p-8 flex items-center justify-between opacity-60 grayscale hover:grayscale-0 transition-all group cursor-pointer">
+        <div class="flex items-center gap-6">
+          <div class="w-16 h-10 bg-red-900/40 rounded border border-red-400/20"></div>
+          <div><h3 class="font-headline font-bold text-xl text-white">Axis Magnus</h3><p class="text-xs text-outline">Best for Ultra-Luxury Travel</p></div>
+        </div>
+        <span class="ms text-outline group-hover:text-primary transition-colors">expand_more</span>
+      </article>
+    </section>
+  </div>`;
+    }
+
+    /* ═══ DNA ═══ */
+    function renderDNA() {
+      renderHeader('detail', 'Subscription DNA');
+      const peers = [
+        { service: 'Adobe Creative Cloud', pct: 73, text: '73% of creators with Canva Pro 8+ months also use Adobe CC' },
+        { service: 'Notion workspace', pct: 81, text: '81% of creators in your cluster use Notion for project tracking' },
+        { service: 'LinkedIn Premium', pct: 67, text: '67% of creators upgrade to LinkedIn Premium after 12 months' }
+      ];
+
+      $('#screen-dna').innerHTML = `<div class="px-4 md:px-8 max-w-4xl mx-auto space-y-8 pt-4 pb-32">
+    <!-- SECTION 1: DNA PROFILE CARD (Hero) -->
+    <section class="relative overflow-hidden rounded-3xl border border-brand-teal/20 p-8 bg-gradient-to-br from-[#1A1A2E] to-[#16213E] shadow-2xl shadow-brand-teal/5">
+      <div class="absolute -top-24 -right-24 w-64 h-64 bg-brand-teal/10 blur-[100px] rounded-full pointer-events-none"></div>
+      <div class="relative z-10 flex flex-col items-center text-center space-y-6">
+        <p class="text-on-surface-variant font-label text-xs tracking-widest uppercase">Your subscription DNA</p>
+        <div class="space-y-2">
+          <h2 class="font-headline font-bold text-4xl text-white">The Creator</h2>
+          <p class="text-on-surface-variant font-body text-sm">Design-first • Tool-heavy • Premium card user</p>
+        </div>
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-teal/10 border border-brand-teal/30 rounded-full shadow-[0_0_15px_rgba(0,201,167,0.2)]">
+          <span class="w-2 h-2 rounded-full bg-brand-teal animate-pulse"></span>
+          <span class="text-brand-teal font-headline font-bold text-sm tracking-tight">94% match</span>
+        </div>
+        <div class="flex items-center gap-3 pt-4">
+          <div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center font-headline font-bold text-xs text-on-surface shadow-lg">CC</div>
+          <div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center font-headline font-bold text-xs text-on-surface shadow-lg">AC</div>
+          <div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center font-headline font-bold text-xs text-on-surface shadow-lg">FI</div>
+          <div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center font-headline font-bold text-xs text-on-surface shadow-lg">NO</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: DNA BREAKDOWN -->
+    <section class="flex overflow-x-auto gap-3 py-2 hide-scroll">
+      <div class="flex-shrink-0 px-5 py-3 rounded-2xl bg-surface-container-low border border-outline-variant/15 text-on-surface font-medium text-sm whitespace-nowrap">9 active subscriptions</div>
+      <div class="flex-shrink-0 px-5 py-3 rounded-2xl bg-surface-container-low border border-outline-variant/15 text-on-surface font-medium text-sm whitespace-nowrap">₹3,347 / month</div>
+      <div class="flex-shrink-0 px-5 py-3 rounded-2xl bg-surface-container-low border border-outline-variant/15 text-on-surface font-medium text-sm whitespace-nowrap">4 cards across 3 banks</div>
+      <div class="flex-shrink-0 px-5 py-3 rounded-2xl bg-surface-container-low border border-outline-variant/15 text-on-surface font-medium text-sm whitespace-nowrap">Creator cluster · top 12%</div>
+    </section>
+
+    <!-- SECTION 3: PEER INSIGHTS -->
+    <section class="space-y-4">
+      <div class="flex justify-between items-end px-2">
+        <h3 class="font-headline font-bold text-xl text-on-surface">What creators like you do</h3>
+        <span class="text-on-surface-variant font-label text-[10px] uppercase tracking-wider">Based on 2,847 users</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        ${peers.map(p => `
+        <div class="p-5 rounded-2xl bg-surface-container border border-outline-variant/10 flex flex-col justify-between h-full hover:bg-surface-container-high transition-colors">
+          <div class="space-y-3">
+            <div class="flex justify-between items-start">
+              <h4 class="font-headline font-bold text-on-surface">${p.service}</h4>
+              <span class="text-brand-teal font-headline font-bold text-sm">${p.pct}%</span>
+            </div>
+            <div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+              <div class="bg-brand-teal h-full rounded-full" style="width:${p.pct}%"></div>
+            </div>
+            <p class="text-on-surface-variant text-xs leading-relaxed">${p.text}</p>
+          </div>
+          <button class="mt-6 text-brand-teal text-xs font-semibold flex items-center gap-1 transition-all">
+            See offer on your SBI card <span class="ms text-[14px]">arrow_forward</span>
+          </button>
+        </div>`).join('')}
+      </div>
+    </section>
+
+    <!-- SECTION 4: LIFE STAGE ALERT (Urgent) -->
+    <section class="bg-[#1C1400] border border-secondary/20 rounded-3xl p-6 md:p-8 space-y-6 relative overflow-hidden">
+      <div class="absolute top-0 right-0 p-4 opacity-10">
+        <span class="ms text-6xl text-secondary">warning</span>
+      </div>
+      <div class="space-y-2 relative z-10">
+        <div class="flex items-center gap-2 text-secondary">
+          <span class="ms text-sm">emergency_home</span>
+          <span class="font-label text-xs uppercase tracking-widest font-bold">Transition detected</span>
+        </div>
+        <h3 class="font-headline font-bold text-2xl text-white">You may be moving toward freelance work</h3>
+        <p class="text-on-surface-variant text-sm max-w-xl leading-relaxed">Your recent additions — <span class="text-on-surface font-medium">Zoom Pro, Notion, LinkedIn Premium</span> — match the freelance transition pattern seen in 3,200+ SpendSync users.</p>
+      </div>
+      <div class="flex flex-wrap gap-2 relative z-10">
+        <span class="px-3 py-1 rounded-full bg-[#332500] text-secondary text-[10px] font-bold uppercase tracking-tight border border-secondary/10">Zoom Pro added</span>
+        <span class="px-3 py-1 rounded-full bg-[#332500] text-secondary text-[10px] font-bold uppercase tracking-tight border border-secondary/10">Notion added</span>
+        <span class="px-3 py-1 rounded-full bg-[#332500] text-secondary text-[10px] font-bold uppercase tracking-tight border border-secondary/10">LinkedIn Premium added</span>
+      </div>
+      <div class="bg-white/5 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-brand-teal/20 flex items-center justify-center flex-shrink-0">
+            <span class="ms text-brand-teal">receipt_long</span>
+          </div>
+          <p class="text-on-surface text-sm font-medium">6 of your subscriptions may be GST-claimable as business expenses</p>
+        </div>
+        <button class="bg-brand-teal text-[#3f4041] font-headline font-bold px-6 py-3 rounded-full active:scale-95 transition-all shadow-lg shadow-brand-teal/20 whitespace-nowrap">
+          Set up GST tracking →
+        </button>
+      </div>
+    </section>
+
+    <!-- SECTION 5: DNA EVOLUTION -->
+    <section class="space-y-8 py-8">
+      <h3 class="font-headline font-bold text-xl text-on-surface px-2">DNA evolution</h3>
+      <div class="relative px-4">
+        <div class="absolute top-1/2 left-4 right-4 h-px bg-outline-variant/30 -translate-y-1/2"></div>
+        <div class="relative z-10 flex justify-between">
+          <div class="flex flex-col items-center gap-4">
+            <div class="w-4 h-4 rounded-full bg-outline-variant border-4 border-surface"></div>
+            <div class="text-center"><p class="text-on-surface-variant font-headline font-bold text-sm">Student</p><p class="text-on-surface-variant font-label text-[10px]">18m ago</p></div>
+          </div>
+          <div class="flex flex-col items-center gap-4">
+            <div class="w-4 h-4 rounded-full bg-outline-variant border-4 border-surface"></div>
+            <div class="text-center"><p class="text-on-surface-variant font-headline font-bold text-sm">Young Professional</p><p class="text-on-surface-variant font-label text-[10px]">8m ago</p></div>
+          </div>
+          <div class="flex flex-col items-center gap-4">
+            <div class="w-6 h-6 rounded-full bg-brand-teal border-4 border-surface-container shadow-[0_0_15px_rgba(0,201,167,0.5)]"></div>
+            <div class="text-center"><p class="text-brand-teal font-headline font-bold text-sm">Creator</p><p class="text-brand-teal font-label text-[10px]">Now</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>`;
+    }
+
+    /* ═══ INIT ═══ */
+    function init() {
+      $$('.screen').forEach(s => s.classList.add('hidden'));
+      $('#screen-dashboard').classList.remove('hidden'); $('#screen-dashboard').classList.add('active');
+      renderDashboard(); updateBottomNav('dashboard');
+    }
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+
+</html>
