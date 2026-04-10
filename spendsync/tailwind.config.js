@@ -1,0 +1,43 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ['./app/**/*.{tsx,ts}', './components/**/*.{tsx,ts}'],
+  presets: [require('nativewind/preset')],
+  theme: {
+    extend: {
+      fontFamily: {
+        headline: ['Manrope_700Bold'],
+        body: ['Inter_400Regular'],
+        label: ['Inter_500Medium'],
+      },
+      colors: {
+        primary: '#c6c6c7',
+        'primary-dim': '#b8b9b9',
+        'primary-container': '#454747',
+        'on-primary': '#3f4041',
+        secondary: '#ffbf00',
+        'secondary-dim': '#eeb200',
+        'secondary-container': '#4e3800',
+        'on-secondary': '#563e00',
+        tertiary: '#ff716b',
+        error: '#ee7d77',
+        'on-surface': '#e7e5e4',
+        'on-surface-variant': '#acabaa',
+        surface: '#0e0e0e',
+        'surface-container-lowest': '#000000',
+        'surface-container-low': '#131313',
+        'surface-container': '#191a1a',
+        'surface-container-high': '#1f2020',
+        'surface-container-highest': '#252626',
+        'surface-bright': '#2c2c2c',
+        outline: '#767575',
+        'outline-variant': '#484848',
+        'brand-teal': '#00C9A7',
+        'chart-1': '#FF6D00',
+        'chart-2': '#00BFA5',
+        'chart-3': '#304FFE',
+        'chart-4': '#F50057',
+        'chart-5': '#FFD600',
+      },
+    },
+  },
+};
