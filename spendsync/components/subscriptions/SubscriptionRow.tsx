@@ -1,6 +1,3 @@
-// ── FILE: components/subscriptions/SubscriptionRow.tsx ───────────────────────
-// Swipeable subscription row — swipe-left reveals red Cancel action.
-
 import React, { useRef, useCallback } from 'react';
 import {
   View,
@@ -16,6 +13,8 @@ import { StatusBadge } from './StatusBadge';
 import { fmt, fmtCycle } from '../../lib/formatters';
 import type { Subscription } from '../../store/useStore';
 import { COLORS } from '../../constants/theme';
+import { BrandLogo } from '../ui/BrandLogo';
+import { getSubscriptionLogoUri } from '../../constants/logoMap';
 
 const SWIPE_THRESHOLD = 80;
 const ACTION_WIDTH = 80;
@@ -49,15 +48,16 @@ export function SubscriptionRow({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
-      onPanResponderMove: (_, g) => {
-        const newX = swipedOpen.current ? g.dx - ACTION_WIDTH : g.dx;
-        if (newX < 0) {
-          translateX.setValue(Math.max(newX, -ACTION_WIDTH));
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      onPanResponderMove: (_, gesture) => {
+        const nextX = swipedOpen.current ? gesture.dx - ACTION_WIDTH : gesture.dx;
+        if (nextX < 0) {
+          translateX.setValue(Math.max(nextX, -ACTION_WIDTH));
         }
       },
-      onPanResponderRelease: (_, g) => {
-        const currentX = swipedOpen.current ? g.dx - ACTION_WIDTH : g.dx;
+      onPanResponderRelease: (_, gesture) => {
+        const currentX = swipedOpen.current ? gesture.dx - ACTION_WIDTH : gesture.dx;
         if (currentX < -SWIPE_THRESHOLD) {
           Animated.spring(translateX, {
             toValue: -ACTION_WIDTH,
@@ -94,45 +94,47 @@ export function SubscriptionRow({
   };
 
   const statusBorderColor =
-    subscription.status === 'urgent'       ? COLORS.error :
-    subscription.status === 'warning'      ? COLORS.secondary :
+    subscription.status === 'urgent' ? COLORS.error :
+    subscription.status === 'warning' ? COLORS.secondary :
     subscription.status === 'trial-urgent' ? COLORS.primary :
     COLORS.outlineVariant;
 
+  const brandLogoUri = getSubscriptionLogoUri(subscription.name);
+
   return (
     <View style={styles.outerContainer}>
-      {/* Cancel action revealed on swipe */}
       <View style={styles.cancelAction}>
         <Pressable onPress={handleCancel} style={styles.cancelButton}>
-          <Text style={styles.cancelIcon}>✕</Text>
+          <Text style={styles.cancelIcon}>x</Text>
           <Text style={styles.cancelText}>Cancel</Text>
         </Pressable>
       </View>
 
-      {/* Row content */}
       <Animated.View
         style={[styles.row, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
-        {/* Status accent */}
         <View style={[styles.statusBar, { backgroundColor: statusBorderColor }]} />
 
-        {/* Icon */}
-        <View style={styles.iconContainer}>
-          <Text style={styles.iconText}>{getIconEmoji(subscription.icon)}</Text>
+        <View style={styles.logoWrap}>
+          <BrandLogo
+            label={subscription.name}
+            uri={brandLogoUri}
+            size={44}
+            fallbackText={getIconEmoji(subscription.icon)}
+          />
         </View>
 
-        {/* Content */}
         <View style={styles.content}>
           <View style={styles.topRow}>
             <Text style={styles.name} numberOfLines={1}>{subscription.name}</Text>
             <Text style={styles.amount}>{fmt(subscription.amount)}</Text>
           </View>
           <View style={styles.bottomRow}>
-            <Text style={styles.meta}>
+            <Text style={styles.meta} numberOfLines={1}>
               {fmtCycle(subscription.cycle)}
-              {showCard && cardVariant ? ` · ${cardVariant}` : ''}
-              {` · ${subscription.category}`}
+              {showCard && cardVariant ? ` - ${cardVariant}` : ''}
+              {` - ${subscription.category}`}
             </Text>
             <StatusBadge status={subscription.status} renewalDays={subscription.renewalDays} />
           </View>
@@ -144,12 +146,22 @@ export function SubscriptionRow({
 
 function getIconEmoji(icon: string): string {
   const map: Record<string, string> = {
-    movie: '🎬', music_note: '🎵', local_shipping: '📦', play_circle: '▶️',
-    stars: '⭐', restaurant: '🍽️', palette: '🎨', brush: '🖌️',
-    cloud: '☁️', video_camera_front: '📹', fastfood: '🍔', work: '💼',
-    'auto_awesome': '✨', 'notifications_active': '🔔',
+    movie: 'TV',
+    music_note: 'MU',
+    local_shipping: 'AM',
+    play_circle: 'YT',
+    stars: 'DS',
+    restaurant: 'FD',
+    palette: 'CN',
+    brush: 'AD',
+    cloud: 'CL',
+    video_camera_front: 'ZM',
+    fastfood: 'SW',
+    work: 'IN',
+    auto_awesome: 'SP',
+    notifications_active: 'NT',
   };
-  return map[icon] ?? '●';
+  return map[icon] ?? 'SS';
 }
 
 const styles = StyleSheet.create({
@@ -177,6 +189,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+    textTransform: 'uppercase',
   },
   cancelText: {
     color: '#fff',
@@ -193,20 +206,10 @@ const styles = StyleSheet.create({
   statusBar: {
     width: 3,
     alignSelf: 'stretch',
-    borderRadius: 0,
   },
-  iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#252626',
-    alignItems: 'center',
-    justifyContent: 'center',
+  logoWrap: {
     marginLeft: 12,
     marginVertical: 12,
-  },
-  iconText: {
-    fontSize: 20,
   },
   content: {
     flex: 1,
@@ -235,6 +238,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
   },
   meta: {
     color: '#acabaa',

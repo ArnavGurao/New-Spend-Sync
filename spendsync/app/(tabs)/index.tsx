@@ -25,6 +25,8 @@ import { SMSBottomSheet } from '../../components/sms/SMSBottomSheet';
 import { fmt, getGreeting } from '../../lib/formatters';
 import { simulateIncomingSMS } from '../../lib/smsSync';
 import { COLORS } from '../../constants/theme';
+import { BrandLogo } from '../../components/ui/BrandLogo';
+import { getSubscriptionLogoUri } from '../../constants/logoMap';
 import type { ParsedSMS } from '../../lib/smsSync';
 
 export default function DashboardScreen(): React.JSX.Element {
@@ -173,8 +175,15 @@ export default function DashboardScreen(): React.JSX.Element {
                 return (
                   <View key={sub.id} style={styles.subRow}>
                     <View style={styles.subRowLeft}>
-                      <Text style={styles.subName}>{sub.name}</Text>
-                      <Text style={styles.subMeta}>{card?.variant ?? 'Unknown card'}</Text>
+                      <BrandLogo
+                        label={sub.name}
+                        uri={getSubscriptionLogoUri(sub.name)}
+                        size={42}
+                      />
+                      <View style={styles.subCopy}>
+                        <Text style={styles.subName}>{sub.name}</Text>
+                        <Text style={styles.subMeta}>{card?.variant ?? 'Unknown card'}</Text>
+                      </View>
                     </View>
                     <Text style={styles.subAmount}>{fmt(sub.amount)}</Text>
                   </View>
@@ -361,7 +370,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#252626',
   },
-  subRowLeft: { gap: 4 },
+  subRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    marginRight: 12,
+  },
+  subCopy: { gap: 4, flex: 1 },
   subName: { color: '#e7e5e4', fontSize: 15, fontWeight: '600' },
   subMeta: { color: '#acabaa', fontSize: 12 },
   subAmount: { color: '#ffbf00', fontSize: 14, fontWeight: '700' },
