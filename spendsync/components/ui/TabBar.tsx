@@ -82,13 +82,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(25,26,26,0.92)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(72,72,72,0.15)',
+    paddingTop: 6,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    height: 56,
-    paddingHorizontal: 12,
+    height: 62,
+    paddingHorizontal: 14,
   },
   tab: {
     flex: 1,
@@ -97,10 +98,12 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    gap: 6,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    gap: 7,
   },
   pillActive: {
     backgroundColor: COLORS.surfaceContainerHighest,

@@ -1,5 +1,3 @@
-// ── FILE: components/cards/CreditCard.tsx ────────────────────────────────────
-
 import React, { useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
@@ -16,12 +14,12 @@ import { fmt } from '../../lib/formatters';
 import type { Card, Subscription } from '../../store/useStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - 48;
+const DEFAULT_CARD_WIDTH = SCREEN_WIDTH - 48;
 
 const SIZE_CONFIG = {
-  hero:      { width: CARD_WIDTH, height: 192 },
-  stacked:   { width: CARD_WIDTH, height: 224 },
-  thumbnail: { width: 120,        height: 76  },
+  hero: { width: DEFAULT_CARD_WIDTH, height: 192 },
+  stacked: { width: DEFAULT_CARD_WIDTH, height: 224 },
+  thumbnail: { width: 120, height: 76 },
 };
 
 interface CreditCardProps {
@@ -30,6 +28,7 @@ interface CreditCardProps {
   onPress?: () => void;
   size?: 'hero' | 'stacked' | 'thumbnail';
   flippable?: boolean;
+  cardWidth?: number;
 }
 
 export function CreditCard({
@@ -38,9 +37,11 @@ export function CreditCard({
   onPress,
   size = 'hero',
   flippable = true,
+  cardWidth,
 }: CreditCardProps): React.JSX.Element {
   const isFlipped = useSharedValue(0);
-  const { width, height } = SIZE_CONFIG[size];
+  const { width: defaultWidth, height } = SIZE_CONFIG[size];
+  const resolvedWidth = cardWidth ?? defaultWidth;
   const gradientColors = getGradientColors(card.bank) as [string, string, ...string[]];
 
   const totalSubs = subscriptions.filter((s) => s.cardId === card.id);
@@ -62,7 +63,6 @@ export function CreditCard({
     onPress?.();
   }, [flippable, isFlipped, onPress]);
 
-  // Front face style
   const frontAnimStyle = useAnimatedStyle(() => {
     const rotateY = interpolate(isFlipped.value, [0, 1], [0, 180], Extrapolation.CLAMP);
     return {
@@ -71,7 +71,6 @@ export function CreditCard({
     };
   });
 
-  // Back face style
   const backAnimStyle = useAnimatedStyle(() => {
     const rotateY = interpolate(isFlipped.value, [0, 1], [180, 360], Extrapolation.CLAMP);
     return {
@@ -82,18 +81,18 @@ export function CreditCard({
 
   const networkLabel =
     card.network === 'Visa' ? 'VISA' :
-    card.network === 'Mastercard' ? '⬤◉ MC' : 'RuPay';
+    card.network === 'Mastercard' ? 'MC' : 'RuPay';
 
   if (size === 'thumbnail') {
     return (
-      <Pressable onPress={handlePress} style={[styles.container, { width, height }]}>
+      <Pressable onPress={handlePress} style={[styles.container, { width: resolvedWidth, height }]}>
         <LinearGradient
           colors={gradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.gradient, { borderRadius: 8 }]}
         >
-          <Text style={styles.thumbnailLast4}>••{card.last4}</Text>
+          <Text style={styles.thumbnailLast4}>..{card.last4}</Text>
           <Text style={styles.thumbnailBank}>{card.bank.split(' ')[0]}</Text>
         </LinearGradient>
       </Pressable>
@@ -101,8 +100,7 @@ export function CreditCard({
   }
 
   return (
-    <View style={[styles.container, { width, height }]}>
-      {/* Front */}
+    <View style={[styles.container, { width: resolvedWidth, height }]}>
       <Animated.View style={[StyleSheet.absoluteFill, frontAnimStyle]}>
         <Pressable onPress={handlePress} style={{ flex: 1 }}>
           <LinearGradient
@@ -111,7 +109,6 @@ export function CreditCard({
             end={{ x: 1, y: 1 }}
             style={styles.gradient}
           >
-            {/* Header row */}
             <View style={styles.row}>
               <View>
                 <Text style={styles.bank}>{card.bank}</Text>
@@ -122,15 +119,13 @@ export function CreditCard({
               </View>
             </View>
 
-            {/* Chip + number */}
             <View style={styles.chipRow}>
               <View style={styles.chip} />
             </View>
             <Text style={styles.cardNumber}>
-              •••• •••• •••• {card.last4}
+              **** **** **** {card.last4}
             </Text>
 
-            {/* Footer */}
             <View style={[styles.row, { marginTop: 8 }]}>
               <View>
                 <Text style={styles.subLabel}>EXPIRES</Text>
@@ -147,7 +142,6 @@ export function CreditCard({
         </Pressable>
       </Animated.View>
 
-      {/* Back */}
       {flippable && (
         <Animated.View style={[StyleSheet.absoluteFill, backAnimStyle]}>
           <Pressable onPress={handlePress} style={{ flex: 1 }}>

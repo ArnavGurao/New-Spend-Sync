@@ -1,17 +1,15 @@
-// ── FILE: app/(tabs)/_layout.tsx ──────────────────────────────────────────────
-// Tab navigator with custom TabBar component.
+// Tab navigator with the bottom tab bar hidden because the app now uses the fixed shell navigation.
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { TabBar } from '../../components/ui/TabBar';
 
 export default function TabsLayout(): React.JSX.Element {
   return (
     <Tabs
-      tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         headerShown: false,
         animation: 'shift',
+        tabBarStyle: { display: 'none' },
       }}
     >
       <Tabs.Screen
